@@ -21,11 +21,13 @@ import (
 	"net/http"
 
 	"github.com/knative/pkg/configmap"
+	tracingconfig "github.com/knative/serving/pkg/tracing/config"
 )
 
 type cfgKey struct{}
 
 type Config struct {
+	Tracing *tracingconfig.Config
 }
 
 func FromContext(ctx context.Context) *Config {
@@ -46,7 +48,9 @@ func NewStore(logger configmap.Logger) *Store {
 		UntypedStore: configmap.NewUntypedStore(
 			"activator",
 			logger,
-			configmap.Constructors{},
+			configmap.Constructors{
+				tracingconfig.ConfigName: tracingconfig.NewTracingConfigFromConfigMap,
+			},
 		),
 	}
 }
@@ -56,7 +60,9 @@ func (s *Store) ToContext(ctx context.Context) context.Context {
 }
 
 func (s *Store) Load() *Config {
-	return &Config{}
+	return &Config{
+		Tracing: s.UntypedLoad(tracingconfig.ConfigName).(*tracingconfig.Config).DeepCopy(),
+	}
 }
 
 type storeMiddleware struct {

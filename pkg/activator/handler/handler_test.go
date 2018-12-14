@@ -13,6 +13,7 @@ limitations under the License.
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,8 @@ import (
 	. "github.com/knative/pkg/logging/testing"
 	"github.com/knative/serving/pkg/activator"
 	"github.com/knative/serving/pkg/activator/util"
+	"github.com/knative/serving/pkg/tracing"
+	"github.com/opentracing/opentracing-go/mocktracer"
 )
 
 type stubActivator struct {
@@ -216,6 +219,17 @@ func TestActivationHandler(t *testing.T) {
 		},
 	}
 
+	mt := mocktracer.New()
+	trGetter := func(ctx context.Context) *tracing.TracerRef {
+		ref := &tracing.TracerRef{
+			Tracer: &tracing.ZipkinTracer{
+				Tracer: mt,
+			},
+		}
+		ref.Ref()
+		return ref
+	}
+
 	for _, e := range examples {
 		t.Run(e.label, func(t *testing.T) {
 			rt := util.RoundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -238,6 +252,7 @@ func TestActivationHandler(t *testing.T) {
 				Transport: rt,
 				Logger:    TestLogger(t),
 				Reporter:  reporter,
+				TRGetter:  trGetter,
 			}
 
 			resp := httptest.NewRecorder()

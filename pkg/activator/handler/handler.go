@@ -24,6 +24,7 @@ import (
 	"github.com/knative/serving/pkg/activator"
 	"github.com/knative/serving/pkg/activator/util"
 	pkghttp "github.com/knative/serving/pkg/http"
+	"github.com/knative/serving/pkg/tracing"
 	"go.uber.org/zap"
 )
 
@@ -34,6 +35,7 @@ type ActivationHandler struct {
 	Logger    *zap.SugaredLogger
 	Transport http.RoundTripper
 	Reporter  activator.StatsReporter
+	TRGetter  tracing.TracerRefGetter
 }
 
 func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,19 @@ func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		statusCode:     http.StatusOK,
 	}
 
+	ctx := r.Context()
+	tracerRef := a.TRGetter(ctx)
+	if tracerRef == nil {
+		a.Logger.Error("Unable to get tracer from request context")
+		return
+	}
+	defer tracerRef.Done()
+
+	tracer := tracerRef.Tracer.Tracer
+	activateSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "active_endpoint")
+	a.Logger.Errorf("Activator: %v", a.Activator)
 	ar := a.Activator.ActiveEndpoint(namespace, name)
+	activateSpan.Finish()
 	if ar.Error != nil {
 		msg := fmt.Sprintf("Error getting active endpoint: %v", ar.Error)
 		a.Logger.Error(msg)
@@ -54,6 +68,8 @@ func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	reqSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "proxy_request")
+	defer reqSpan.Finish()
 	target := &url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("%s:%d", ar.Endpoint.FQDN, ar.Endpoint.Port),

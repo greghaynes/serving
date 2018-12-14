@@ -29,6 +29,7 @@ import (
 	"github.com/knative/serving/cmd/util"
 	"github.com/knative/serving/pkg/activator/config"
 	"github.com/knative/serving/pkg/autoscaler"
+	"github.com/knative/serving/pkg/tracing"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/knative/pkg/logging/logkey"
@@ -105,6 +106,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error parsing logging configuration: %v", err)
 	}
+
 	createdLogger, atomicLevel := logging.NewLoggerFromConfig(logConfig, component)
 	logger = createdLogger.With(zap.String(logkey.ControllerType, "activator"))
 	defer logger.Sync()
@@ -168,8 +170,18 @@ func main() {
 	cr := activatorhandler.NewConcurrencyReporter(podName, reqChan, time.NewTicker(time.Second).C, statChan)
 	go cr.Run(stopCh)
 
-	ah := &activatorhandler.FilteringHandler{
-		NextHandler: activatorhandler.NewRequestEventHandler(reqChan,
+	tracerCache := tracing.TracerCache{}
+	tracerGetter := func(ctx context.Context) *tracing.TracerRef {
+		cfg := config.FromContext(ctx)
+		ref, err := tracerCache.GetTracer(cfg.Tracing)
+		if err != nil {
+			logger.Errorf("Unable to create tracer from tracer config: %v", err)
+		}
+		return ref
+	}
+
+	ah := configStore.HTTPMiddleware(&activatorhandler.FilteringHandler{
+		NextHandler: tracing.HTTPSpanMiddleware(logger, "handle_request", tracerGetter, activatorhandler.NewRequestEventHandler(reqChan,
 			&activatorhandler.EnforceMaxContentLengthHandler{
 				MaxContentLengthBytes: maxUploadBytes,
 				NextHandler: &activatorhandler.ActivationHandler{
@@ -177,10 +189,12 @@ func main() {
 					Transport: rt,
 					Logger:    logger,
 					Reporter:  reporter,
+					TRGetter:  tracerGetter,
 				},
 			},
 		),
-	}
+		),
+	})
 
 	// Watch the logging config map and dynamically update logging levels.
 	configMapWatcher.Watch(logging.ConfigName, logging.UpdateLevelFromConfigMap(logger, atomicLevel, component))
@@ -200,4 +214,5 @@ func main() {
 	<-stopCh
 	a.Shutdown()
 	srv.Shutdown(context.TODO())
+	tracerCache.Close()
 }
