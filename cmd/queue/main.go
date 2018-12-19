@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -43,6 +44,7 @@ import (
 	"go.opencensus.io/exporter/prometheus"
 	"go.opencensus.io/stats/view"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -322,14 +324,24 @@ func main() {
 		fmt.Sprintf(":%d", queue.RequestQueuePort),
 		queue.TimeToFirstByteTimeoutHandler(http.HandlerFunc(handler), time.Duration(revisionTimeoutSeconds)*time.Second, "request timeout"))
 
-	go server.ListenAndServe()
-	go setupAdminHandlers(adminServer)
-
 	// Shutdown logic and signal handling
 	sigTermChan := make(chan os.Signal)
 	signal.Notify(sigTermChan, syscall.SIGTERM)
-	// Blocks until we actually receive a TERM signal.
-	<-sigTermChan
+
+	var g errgroup.Group
+	g.Go(server.ListenAndServe)
+	g.Go(func() error {
+		setupAdminHandlers(adminServer)
+		return errors.New("Admin server exited")
+	})
+	g.Go(func() error {
+		<-sigTermChan
+		return errors.New("Got SIGTERM")
+	})
+	if err := g.Wait(); err != nil {
+		logger.Errorf("Shutting down: %v", err)
+	}
+
 	// Calling server.Shutdown() allows pending requests to
 	// complete, while no new work is accepted.
 	logger.Debug("Received TERM signal, attempting to gracefully shutdown servers.")
