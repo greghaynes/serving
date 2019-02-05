@@ -26,4 +26,4 @@ data:
 
   # Enable zipkin debug mode. This allows all spans to be sent to the server
   # bypassing sampling.
-  debug: "false"
+  debug: "true"

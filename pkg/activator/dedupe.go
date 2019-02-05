@@ -17,6 +17,7 @@ limitations under the License.
 package activator
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sync"
@@ -46,10 +47,10 @@ func NewDedupingActivator(a Activator) Activator {
 	}
 }
 
-func (a *dedupingActivator) ActiveEndpoint(namespace, name string) ActivationResult {
+func (a *dedupingActivator) ActiveEndpoint(namespace, name string, ctx context.Context) ActivationResult {
 	id := revisionID{namespace: namespace, name: name}
 	ch := make(chan ActivationResult, 1)
-	a.dedupe(id, ch)
+	a.dedupe(id, ch, ctx)
 	result := <-ch
 	return result
 }
@@ -66,7 +67,7 @@ func (a *dedupingActivator) Shutdown() {
 	}
 }
 
-func (a *dedupingActivator) dedupe(id revisionID, ch chan ActivationResult) {
+func (a *dedupingActivator) dedupe(id revisionID, ch chan ActivationResult, ctx context.Context) {
 	a.mux.Lock()
 	defer a.mux.Unlock()
 	if a.shutdown {
@@ -77,12 +78,12 @@ func (a *dedupingActivator) dedupe(id revisionID, ch chan ActivationResult) {
 		a.pendingRequests[id] = append(reqs, ch)
 	} else {
 		a.pendingRequests[id] = []chan ActivationResult{ch}
-		go a.activate(id)
+		go a.activate(id, ctx)
 	}
 }
 
-func (a *dedupingActivator) activate(id revisionID) {
-	result := a.activator.ActiveEndpoint(id.namespace, id.name)
+func (a *dedupingActivator) activate(id revisionID, ctx context.Context) {
+	result := a.activator.ActiveEndpoint(id.namespace, id.name, ctx)
 	a.mux.Lock()
 	defer a.mux.Unlock()
 	if reqs, ok := a.pendingRequests[id]; ok {

@@ -14,6 +14,7 @@ limitations under the License.
 package tracing
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -98,4 +99,14 @@ func (tc *TracerCache) Close() {
 
 	tc.tracerRef = nil
 	tc.cfg = nil
+}
+
+type cfgKey struct{}
+
+func ToContext(ctx context.Context, tracer *ZipkinTracer) context.Context {
+	return context.WithValue(ctx, cfgKey{}, tracer)
+}
+
+func FromContext(ctx context.Context) *ZipkinTracer {
+	return ctx.Value(cfgKey{}).(*ZipkinTracer)
 }

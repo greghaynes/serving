@@ -30,6 +30,7 @@ import (
 	"github.com/knative/serving/pkg/activator/config"
 	"github.com/knative/serving/pkg/autoscaler"
 	"github.com/knative/serving/pkg/tracing"
+	tracingconfig "github.com/knative/serving/pkg/tracing/config"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/knative/pkg/logging/logkey"
@@ -171,17 +172,12 @@ func main() {
 	go cr.Run(stopCh)
 
 	tracerCache := tracing.TracerCache{}
-	tracerGetter := func(ctx context.Context) *tracing.TracerRef {
-		cfg := config.FromContext(ctx)
-		ref, err := tracerCache.GetTracer(cfg.Tracing)
-		if err != nil {
-			logger.Errorf("Unable to create tracer from tracer config: %v", err)
-		}
-		return ref
+	tracerCfgGetter := func(ctx context.Context) *tracingconfig.Config {
+		return config.FromContext(ctx).Tracing
 	}
 
 	ah := configStore.HTTPMiddleware(&activatorhandler.FilteringHandler{
-		NextHandler: tracing.HTTPSpanMiddleware(logger, "handle_request", tracerGetter, activatorhandler.NewRequestEventHandler(reqChan,
+		NextHandler: tracing.HTTPSpanMiddleware(logger, "handle_request", tracerCfgGetter, &tracerCache, activatorhandler.NewRequestEventHandler(reqChan,
 			&activatorhandler.EnforceMaxContentLengthHandler{
 				MaxContentLengthBytes: maxUploadBytes,
 				NextHandler: &activatorhandler.ActivationHandler{
@@ -189,7 +185,6 @@ func main() {
 					Transport: rt,
 					Logger:    logger,
 					Reporter:  reporter,
-					TRGetter:  tracerGetter,
 				},
 			},
 		),

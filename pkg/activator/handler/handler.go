@@ -35,7 +35,6 @@ type ActivationHandler struct {
 	Logger    *zap.SugaredLogger
 	Transport http.RoundTripper
 	Reporter  activator.StatsReporter
-	TRGetter  tracing.TracerRefGetter
 }
 
 func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -49,17 +48,10 @@ func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	tracerRef := a.TRGetter(ctx)
-	if tracerRef == nil {
-		a.Logger.Error("Unable to get tracer from request context")
-		return
-	}
-	defer tracerRef.Done()
-
-	tracer := tracerRef.Tracer.Tracer
-	activateSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "active_endpoint")
+	tracer := tracing.FromContext(ctx).Tracer
+	activateCtx, activateSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "active_endpoint")
 	a.Logger.Errorf("Activator: %v", a.Activator)
-	ar := a.Activator.ActiveEndpoint(namespace, name)
+	ar := a.Activator.ActiveEndpoint(namespace, name, activateCtx)
 	activateSpan.Finish()
 	if ar.Error != nil {
 		msg := fmt.Sprintf("Error getting active endpoint: %v", ar.Error)
@@ -68,7 +60,7 @@ func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "proxy_request")
+	_, reqSpan := tracing.CreateChildSpanFromContext(tracer, ctx, "proxy_request")
 	defer reqSpan.Finish()
 	target := &url.URL{
 		Scheme: "http",

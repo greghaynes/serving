@@ -16,6 +16,8 @@ limitations under the License.
 
 package activator
 
+import "context"
+
 const (
 	// K8sServiceName is the name of the activator service
 	K8sServiceName = "activator-service"
@@ -30,7 +32,7 @@ const (
 // Activator provides an active endpoint for a revision or an error and
 // status code indicating why it could not.
 type Activator interface {
-	ActiveEndpoint(namespace, name string) ActivationResult
+	ActiveEndpoint(namespace, name string, ctx context.Context) ActivationResult
 	Shutdown()
 }
 

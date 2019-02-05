@@ -15,13 +15,10 @@ package tracing
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/knative/serving/pkg/tracing/config"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 	zipkin "github.com/openzipkin/zipkin-go-opentracing"
-	"go.uber.org/zap"
 )
 
 const (
@@ -69,66 +66,17 @@ func CreateZipkinTracer(cfg *config.Config) (*ZipkinTracer, error) {
 	}, nil
 }
 
-func createSpanFromRequest(t opentracing.Tracer, logger *zap.SugaredLogger, r *http.Request, opName string) opentracing.Span {
-	wireContext, _ := t.Extract(
-		opentracing.HTTPHeaders,
-		opentracing.HTTPHeadersCarrier(r.Header))
-
-	// Create the span referring to the RPC client if available.
-	// If wireContext == nil, a root span will be created.
-	return t.StartSpan(
-		opName,
-		ext.RPCServerOption(wireContext))
-}
-
 func (t *ZipkinTracer) Close() {
 	t.collector.Close()
 }
 
-type TracerRefGetter func(context.Context) *TracerRef
-
-type spanHandler struct {
-	logger   *zap.SugaredLogger
-	opName   string
-	next     http.Handler
-	trGetter TracerRefGetter
-}
-
-func (h *spanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tracerRef := h.trGetter(r.Context())
-	if tracerRef == nil {
-		h.logger.Error("Failed to get tracer")
-		h.next.ServeHTTP(w, r)
-		return
-	}
-	defer tracerRef.Done()
-	tracer := tracerRef.Tracer.Tracer
-
-	parentSpan := createSpanFromRequest(tracer, h.logger, r, h.opName)
-	span := tracer.StartSpan(h.opName, opentracing.ChildOf(parentSpan.Context()))
-	defer span.Finish()
-
-	// store span in context
-	ctx := opentracing.ContextWithSpan(r.Context(), span)
-
-	// update request context to include our new span
-	r = r.WithContext(ctx)
-	h.next.ServeHTTP(w, r)
-}
-
-func HTTPSpanMiddleware(logger *zap.SugaredLogger, operationName string, getTr TracerRefGetter, next http.Handler) http.Handler {
-	return &spanHandler{
-		logger:   logger,
-		opName:   operationName,
-		next:     next,
-		trGetter: getTr,
-	}
-}
-
-func CreateChildSpanFromContext(t opentracing.Tracer, ctx context.Context, opName string) opentracing.Span {
+func CreateChildSpanFromContext(t opentracing.Tracer, ctx context.Context, opName string) (context.Context, opentracing.Span) {
 	parentSpan := opentracing.SpanFromContext(ctx)
+	var newSpan opentracing.Span
 	if parentSpan != nil {
-		return t.StartSpan(opName, opentracing.ChildOf(parentSpan.Context()))
+		newSpan = t.StartSpan(opName, opentracing.ChildOf(parentSpan.Context()))
+	} else {
+		newSpan = t.StartSpan(opName)
 	}
-	return t.StartSpan(opName)
+	return opentracing.ContextWithSpan(ctx, newSpan), newSpan
 }
