@@ -49,6 +49,7 @@ import (
 	"github.com/knative/serving/pkg/logging"
 	"github.com/knative/serving/pkg/metrics"
 	"github.com/knative/serving/pkg/network"
+	"github.com/knative/serving/pkg/profiling"
 	"github.com/knative/serving/pkg/queue"
 	"github.com/knative/serving/pkg/reconciler"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/serverlessservice/resources/names"
@@ -280,10 +281,17 @@ func main() {
 	configMapWatcher := configmap.NewInformedWatcher(kubeClient, system.Namespace())
 	configMapWatcher.Watch(logging.ConfigMapName(), logging.UpdateLevelFromConfigMap(logger, atomicLevel, component))
 	// Watch the observability config map and dynamically update metrics exporter.
-	configMapWatcher.Watch(metrics.ObservabilityConfigName, metrics.UpdateExporterFromConfigMap(component, logger))
+	configMapWatcher.Watch(metrics.ObservabilityConfigName, metrics.UpdateExporterFromConfigMap(component, logger, stopCh))
 	if err = configMapWatcher.Start(stopCh); err != nil {
 		logger.Fatalw("Failed to start configuration manager", zap.Error(err))
 	}
+
+	profilerSrv := h2c.NewServer(":9190", profiling.NewHttpProfiler())
+	go func() {
+		if err := profilerSrv.ListenAndServe(); err != nil {
+			logger.Errorw("Error running HTTP server", zap.Error(err))
+		}
+	}()
 
 	http1Srv := h2c.NewServer(":8080", ah)
 	go func() {
@@ -302,4 +310,6 @@ func main() {
 	<-stopCh
 	http1Srv.Shutdown(context.Background())
 	h2cSrv.Shutdown(context.Background())
+	time.Sleep(60 * time.Second)
+	profilerSrv.Shutdown(context.Background())
 }

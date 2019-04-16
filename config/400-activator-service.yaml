@@ -38,4 +38,9 @@ spec:
     port: 9090
     targetPort: 9090
     nodePort: # empty removing existing value to avoid upgrade error # TODO delete after v0.4
+  - name: profiler
+    protocol: TCP
+    port: 9190
+    targetPort: 9190
+    nodePort: # empty removing existing value to avoid upgrade error # TODO delete after v0.4
   type: ClusterIP
