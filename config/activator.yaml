@@ -13,7 +13,7 @@
 # limitations under the License.
 
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: activator
   namespace: knative-serving
@@ -26,8 +26,6 @@ spec:
       role: activator
   template:
     metadata:
-      annotations:
-        sidecar.istio.io/inject: "true"
       labels:
         app: activator
         role: activator
@@ -80,6 +78,10 @@ spec:
             cpu: 200m
             memory: 600Mi
         env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           - name: POD_NAME
             valueFrom:
               fieldRef:
