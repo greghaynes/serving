@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// ActivationEndpointListerExpansion allows custom methods to be added to
+// ActivationEndpointLister.
+type ActivationEndpointListerExpansion interface{}
+
+// ActivationEndpointNamespaceListerExpansion allows custom methods to be added to
+// ActivationEndpointNamespaceLister.
+type ActivationEndpointNamespaceListerExpansion interface{}
+
 // CertificateListerExpansion allows custom methods to be added to
 // CertificateLister.
 type CertificateListerExpansion interface{}

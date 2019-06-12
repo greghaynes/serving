@@ -28,6 +28,10 @@ type FakeNetworkingV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeNetworkingV1alpha1) ActivationEndpoints(namespace string) v1alpha1.ActivationEndpointInterface {
+	return &FakeActivationEndpoints{c, namespace}
+}
+
 func (c *FakeNetworkingV1alpha1) Certificates(namespace string) v1alpha1.CertificateInterface {
 	return &FakeCertificates{c, namespace}
 }

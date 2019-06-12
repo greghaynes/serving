@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// ActivationEndpoints returns a ActivationEndpointInformer.
+	ActivationEndpoints() ActivationEndpointInformer
 	// Certificates returns a CertificateInformer.
 	Certificates() CertificateInformer
 	// ClusterIngresses returns a ClusterIngressInformer.
@@ -41,6 +43,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// ActivationEndpoints returns a ActivationEndpointInformer.
+func (v *version) ActivationEndpoints() ActivationEndpointInformer {
+	return &activationEndpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Certificates returns a CertificateInformer.

@@ -50,6 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ServerlessServiceList{},
 		&Certificate{},
 		&CertificateList{},
+		&ActivationEndpoint{},
+		&ActivationEndpointList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

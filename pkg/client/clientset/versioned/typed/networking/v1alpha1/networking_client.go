@@ -27,6 +27,7 @@ import (
 
 type NetworkingV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	ActivationEndpointsGetter
 	CertificatesGetter
 	ClusterIngressesGetter
 	ServerlessServicesGetter
@@ -35,6 +36,10 @@ type NetworkingV1alpha1Interface interface {
 // NetworkingV1alpha1Client is used to interact with features provided by the networking.internal.knative.dev group.
 type NetworkingV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *NetworkingV1alpha1Client) ActivationEndpoints(namespace string) ActivationEndpointInterface {
+	return newActivationEndpoints(c, namespace)
 }
 
 func (c *NetworkingV1alpha1Client) Certificates(namespace string) CertificateInterface {

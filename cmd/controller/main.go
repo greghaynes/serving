@@ -36,6 +36,7 @@ import (
 	"github.com/knative/pkg/signals"
 	informers "github.com/knative/serving/pkg/client/informers/externalversions"
 	"github.com/knative/serving/pkg/reconciler"
+	"github.com/knative/serving/pkg/reconciler/activationendpoint"
 	"github.com/knative/serving/pkg/reconciler/configuration"
 	"github.com/knative/serving/pkg/reconciler/labeler"
 	"github.com/knative/serving/pkg/reconciler/revision"
@@ -77,7 +78,7 @@ func main() {
 		logger.Fatalw("Error building kubeconfig", zap.Error(err))
 	}
 
-	const numControllers = 6
+	const numControllers = 7
 	cfg.QPS = numControllers * rest.DefaultQPS
 	cfg.Burst = numControllers * rest.DefaultBurst
 	opt := reconciler.NewOptionsOrDie(cfg, logger, stopCh)
@@ -99,6 +100,7 @@ func main() {
 	endpointsInformer := kubeInformerFactory.Core().V1().Endpoints()
 	configMapInformer := kubeInformerFactory.Core().V1().ConfigMaps()
 	imageInformer := cachingInformerFactory.Caching().V1alpha1().Images()
+	aeInformer := servingInformerFactory.Networking().V1alpha1().ActivationEndpoints()
 
 	// Build all of our controllers, with the clients constructed above.
 	// Add new controllers to this array.
@@ -145,6 +147,10 @@ func main() {
 			sksInformer,
 			coreServiceInformer,
 			endpointsInformer,
+		),
+		activationendpoint.NewController(
+			opt,
+			aeInformer,
 		),
 	}
 	// This line asserts at compile time that the length of controllers is equal to numControllers.
