@@ -119,6 +119,7 @@ func main() {
 			coreServiceInformer,
 			endpointsInformer,
 			configMapInformer,
+			aeInformer,
 		),
 		route.NewController(
 			opt,

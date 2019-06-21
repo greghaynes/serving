@@ -23,6 +23,7 @@ import (
 	"github.com/knative/pkg/kmp"
 	"github.com/knative/pkg/logging"
 	kpav1alpha1 "github.com/knative/serving/pkg/apis/autoscaling/v1alpha1"
+	netv1alpha1 "github.com/knative/serving/pkg/apis/networking/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/revision/config"
 	"github.com/knative/serving/pkg/reconciler/revision/resources"
@@ -108,4 +109,9 @@ func (c *Reconciler) createKPA(ctx context.Context, rev *v1alpha1.Revision) (*kp
 	kpa := resources.MakeKPA(rev)
 
 	return c.ServingClientSet.AutoscalingV1alpha1().PodAutoscalers(kpa.Namespace).Create(kpa)
+}
+
+func (c *Reconciler) createActivationEndpoint(ctx context.Context, rev *v1alpha1.Revision) (*netv1alpha1.ActivationEndpoint, error) {
+	ae := resources.MakeActivationEndpoint(rev)
+	return c.ServingClientSet.NetworkingV1alpha1().ActivationEndpoints(ae.Namespace).Create(ae)
 }

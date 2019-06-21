@@ -26,6 +26,7 @@ import (
 	"github.com/knative/serving/pkg/apis/serving"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	painformers "github.com/knative/serving/pkg/client/informers/externalversions/autoscaling/v1alpha1"
+	netinformers "github.com/knative/serving/pkg/client/informers/externalversions/networking/v1alpha1"
 	servinginformers "github.com/knative/serving/pkg/client/informers/externalversions/serving/v1alpha1"
 	"github.com/knative/serving/pkg/deployment"
 	"github.com/knative/serving/pkg/metrics"
@@ -58,6 +59,7 @@ func NewController(
 	serviceInformer corev1informers.ServiceInformer,
 	endpointsInformer corev1informers.EndpointsInformer,
 	configMapInformer corev1informers.ConfigMapInformer,
+	activationEndpointInformer netinformers.ActivationEndpointInformer,
 ) *controller.Impl {
 	transport := http.DefaultTransport
 	if rt, err := newResolverTransport(k8sCertPath); err != nil {
@@ -67,14 +69,15 @@ func NewController(
 	}
 
 	c := &Reconciler{
-		Base:                reconciler.NewBase(opt, controllerAgentName),
-		revisionLister:      revisionInformer.Lister(),
-		podAutoscalerLister: podAutoscalerInformer.Lister(),
-		imageLister:         imageInformer.Lister(),
-		deploymentLister:    deploymentInformer.Lister(),
-		serviceLister:       serviceInformer.Lister(),
-		endpointsLister:     endpointsInformer.Lister(),
-		configMapLister:     configMapInformer.Lister(),
+		Base:                     reconciler.NewBase(opt, controllerAgentName),
+		revisionLister:           revisionInformer.Lister(),
+		podAutoscalerLister:      podAutoscalerInformer.Lister(),
+		imageLister:              imageInformer.Lister(),
+		deploymentLister:         deploymentInformer.Lister(),
+		serviceLister:            serviceInformer.Lister(),
+		endpointsLister:          endpointsInformer.Lister(),
+		configMapLister:          configMapInformer.Lister(),
+		activationEndpointLister: activationEndpointInformer.Lister(),
 		resolver: &digestResolver{
 			client:    opt.KubeClientSet,
 			transport: transport,

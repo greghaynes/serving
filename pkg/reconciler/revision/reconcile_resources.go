@@ -193,3 +193,19 @@ func (c *Reconciler) reconcileKPA(ctx context.Context, rev *v1alpha1.Revision) e
 	}
 	return nil
 }
+
+func (c *Reconciler) reconcileActivationEndpoint(ctx context.Context, rev *v1alpha1.Revision) error {
+	ns := rev.Namespace
+	aeName := resourcenames.ActivationEndpoint(rev)
+	logger := logging.FromContext(ctx)
+	logger.Info("Reconciling ActivationEndpoint: ", aeName)
+
+	ae, err := c.activationEndpointLister.ActivationEndpoints(ns).Get(aeName)
+	if apierrs.IsNotFound(err) {
+		ae, err = c.createActivationEndpoint(ctx, rev)
+	} else if err != nil {
+	} else if !metav1.IsControlledBy(ae, rev) {
+	}
+
+	return nil
+}

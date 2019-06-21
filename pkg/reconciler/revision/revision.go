@@ -28,6 +28,7 @@ import (
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1beta1"
 	kpalisters "github.com/knative/serving/pkg/client/listers/autoscaling/v1alpha1"
+	netlisters "github.com/knative/serving/pkg/client/listers/networking/v1alpha1"
 	listers "github.com/knative/serving/pkg/client/listers/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
 	"github.com/knative/serving/pkg/reconciler/revision/config"
@@ -50,13 +51,14 @@ type Reconciler struct {
 	*reconciler.Base
 
 	// lister indexes properties about Revision
-	revisionLister      listers.RevisionLister
-	podAutoscalerLister kpalisters.PodAutoscalerLister
-	imageLister         cachinglisters.ImageLister
-	deploymentLister    appsv1listers.DeploymentLister
-	serviceLister       corev1listers.ServiceLister
-	endpointsLister     corev1listers.EndpointsLister
-	configMapLister     corev1listers.ConfigMapLister
+	revisionLister           listers.RevisionLister
+	podAutoscalerLister      kpalisters.PodAutoscalerLister
+	imageLister              cachinglisters.ImageLister
+	deploymentLister         appsv1listers.DeploymentLister
+	serviceLister            corev1listers.ServiceLister
+	endpointsLister          corev1listers.EndpointsLister
+	configMapLister          corev1listers.ConfigMapLister
+	activationEndpointLister netlisters.ActivationEndpointLister
 
 	resolver    resolver
 	configStore configStore
@@ -191,6 +193,9 @@ func (c *Reconciler) reconcile(ctx context.Context, rev *v1alpha1.Revision) erro
 	}, {
 		name: "KPA",
 		f:    c.reconcileKPA,
+	}, {
+		name: "activation endpoint",
+		f:    c.reconcileActivationEndpoint,
 	}}
 
 	for _, phase := range phases {
